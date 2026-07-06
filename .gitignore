@@ -1,0 +1,55 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# PyInstaller build output
+build/_pyinstaller/
+dist/
+*.spec.bak
+
+# Downloaded files (indirilen videolar)
+downloads/
+*.mp4
+*.mp3
+*.mkv
+*.webm
+*.m4a
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Settings (user-specific, not for version control)
+config/user_settings.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# FFmpeg (downloaded separately, or bundled in build)
+assets/ffmpeg/ffmpeg.exe
+assets/ffmpeg/ffprobe.exe
