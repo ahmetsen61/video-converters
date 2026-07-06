@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QIcon, QFont, QAction
+from PyQt6.QtGui import QIcon, QFont, QAction, QPixmap
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QScrollArea, QFrame,
@@ -43,6 +43,12 @@ from frontend.widgets.quality_selector import QualitySelectorDialog
 from frontend.widgets.download_card import DownloadCard
 from frontend.widgets.settings_panel import SettingsDialog, load_settings
 from frontend.widgets.history_panel import HistoryPanelWidget
+
+
+def get_icon_path(filename: str) -> str:
+    """Proje assets/icons klasöründen veya paketlenmiş _MEIPASS dizininden ikon yolunu çeker."""
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.abspath(os.path.join(base_dir, "assets", "icons", filename))
 
 
 def _load_stylesheet(theme: str) -> str:
@@ -65,22 +71,29 @@ class EmptyStateWidget(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(12)
 
-        icon_lbl = QLabel("⬇")
-        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_lbl.setStyleSheet("font-size: 52px; color: #2a2a3a;")
+        self._icon_lbl = QLabel()
+        self._icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon_lbl.setFixedSize(100, 100)
 
         title_lbl = QLabel("Henüz indirme yok")
         title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_lbl.setProperty("class", "subtitle")
-        title_lbl.setStyleSheet("font-size: 16px; font-weight: 600;")
+        title_lbl.setProperty("class", "empty-title")
 
         hint_lbl = QLabel("Yukarıya bir YouTube, Instagram veya TikTok linki yapıştırın.")
         hint_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint_lbl.setProperty("class", "muted")
 
-        layout.addWidget(icon_lbl)
+        layout.addWidget(self._icon_lbl, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_lbl)
         layout.addWidget(hint_lbl)
+
+    def update_theme(self, theme: str):
+        suffix = "white" if theme == "dark" else "dark"
+        path = get_icon_path(f"download_{suffix}.png")
+        if os.path.isfile(path):
+            self._icon_lbl.setPixmap(QPixmap(path).scaled(
+                80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
 
 
 class MainWindow(QMainWindow):
@@ -142,7 +155,6 @@ class MainWindow(QMainWindow):
 
         # Ana içerik
         content = QWidget()
-        content.setStyleSheet("background: transparent;")
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(24, 20, 24, 20)
         content_layout.setSpacing(20)
@@ -191,10 +203,9 @@ class MainWindow(QMainWindow):
 
         # Tab Widget
         self._tabs = QTabWidget()
-        self._tabs.setStyleSheet("QTabWidget::pane { border: none; }")
         
         # Tab 1: İndir
-        self._tabs.addTab(content, "⬇  İndir")
+        self._tabs.addTab(content, "İndir")
         
         # Tab 2: Geçmiş
         history_tab = QWidget()
@@ -207,7 +218,7 @@ class MainWindow(QMainWindow):
         self._history_panel.open_folder_requested.connect(self._open_folder)
         
         history_tab_layout.addWidget(self._history_panel)
-        self._tabs.addTab(history_tab, "📜  Geçmiş")
+        self._tabs.addTab(history_tab, "Geçmiş")
         
         # Sekme değişim sinyali
         self._tabs.currentChanged.connect(self._on_tab_changed)
@@ -253,20 +264,20 @@ class MainWindow(QMainWindow):
         row.addSpacing(8)
 
         # Tema toggle
-        self._theme_btn = QPushButton("☀")
-        self._theme_btn.setProperty("class", "icon")
+        self._theme_btn = QPushButton()
+        self._theme_btn.setProperty("class", "ghost")
         self._theme_btn.setFixedSize(36, 36)
         self._theme_btn.setToolTip("Tema değiştir")
         self._theme_btn.clicked.connect(self._toggle_theme)
         row.addWidget(self._theme_btn)
 
         # Ayarlar
-        settings_btn = QPushButton("⚙")
-        settings_btn.setProperty("class", "icon")
-        settings_btn.setFixedSize(36, 36)
-        settings_btn.setToolTip("Ayarlar")
-        settings_btn.clicked.connect(self._open_settings)
-        row.addWidget(settings_btn)
+        self._settings_btn = QPushButton()
+        self._settings_btn.setProperty("class", "ghost")
+        self._settings_btn.setFixedSize(36, 36)
+        self._settings_btn.setToolTip("Ayarlar")
+        self._settings_btn.clicked.connect(self._open_settings)
+        row.addWidget(self._settings_btn)
 
         return header
 
@@ -278,7 +289,29 @@ class MainWindow(QMainWindow):
         self._settings["theme"] = theme
         stylesheet = _load_stylesheet(theme)
         QApplication.instance().setStyleSheet(stylesheet)
-        self._theme_btn.setText("☀" if theme == "dark" else "🌙")
+        self._update_theme_icons(theme)
+
+    def _update_theme_icons(self, theme: str):
+        suffix = "white" if theme == "dark" else "dark"
+        
+        # Tema butonu ikonu
+        theme_icon_name = f"sun_{suffix}.png" if theme == "dark" else f"moon_{suffix}.png"
+        self._theme_btn.setIcon(QIcon(get_icon_path(theme_icon_name)))
+        self._theme_btn.setIconSize(QSize(18, 18))
+        
+        # Ayarlar butonu ikonu
+        self._settings_btn.setIcon(QIcon(get_icon_path(f"settings_{suffix}.png")))
+        self._settings_btn.setIconSize(QSize(18, 18))
+        
+        # Tab ikonları
+        self._tabs.setTabIcon(0, QIcon(get_icon_path(f"download_tab_{suffix}.png")))
+        self._tabs.setTabIcon(1, QIcon(get_icon_path(f"history_tab_{suffix}.png")))
+        self._tabs.setIconSize(QSize(16, 16))
+        
+        # Alt bileşenleri güncelle
+        self._url_input.update_theme(theme)
+        self._empty_state.update_theme(theme)
+        self._history_panel.update_theme(theme)
 
     def _toggle_theme(self):
         current = self._settings.get("theme", "dark")

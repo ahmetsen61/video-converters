@@ -11,14 +11,21 @@ import os
 from datetime import datetime
 from typing import Any
 
+import sys
 import requests
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
     QLabel, QPushButton, QScrollArea, QFrame,
     QSizePolicy, QMessageBox,
 )
+
+def get_icon_path(filename: str) -> str:
+    """Proje assets/icons klasöründen veya paketlenmiş _MEIPASS dizininden ikon yolunu çeker."""
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    return os.path.abspath(os.path.join(base_dir, "assets", "icons", filename))
+
 
 from backend import history_db
 
@@ -56,7 +63,7 @@ class HistoryCard(QFrame):
         self.record = record
         self._image_loader: ImageLoader | None = None
 
-        self.setProperty("class", "card")
+        self.setProperty("class", "item-card")
         self.setFixedHeight(84)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
@@ -71,9 +78,7 @@ class HistoryCard(QFrame):
         # Görsel Alanı (Thumbnail veya Platform İkonu)
         self._img_lbl = QLabel()
         self._img_lbl.setFixedSize(96, 54)
-        self._img_lbl.setStyleSheet(
-            "background-color: #252535; border-radius: 6px; border: 1px solid #2a2a3a;"
-        )
+        self._img_lbl.setProperty("class", "thumbnail")
         self._img_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._set_default_platform_icon()
         layout.addWidget(self._img_lbl)
@@ -97,7 +102,7 @@ class HistoryCard(QFrame):
         badge_color = "#e94560" if fmt == "MP4" else "#7c5cbf"
         fmt_badge.setStyleSheet(
             f"background: {badge_color}; color: #fff; border-radius: 4px; "
-            "padding: 1px 6px; font-size: 9px; font-weight: 700;"
+            "padding: 1px 6px; font-size: 7pt; font-weight: 700;"
         )
         fmt_badge.setFixedHeight(16)
 
@@ -105,7 +110,7 @@ class HistoryCard(QFrame):
         quality_badge = QLabel(quality)
         quality_badge.setStyleSheet(
             "background: #2a2a3a; color: #a0a0b0; border-radius: 4px; "
-            "padding: 1px 6px; font-size: 9px; font-weight: 600;"
+            "padding: 1px 6px; font-size: 7pt; font-weight: 600;"
         )
         quality_badge.setFixedHeight(16)
         if not quality:
@@ -131,14 +136,14 @@ class HistoryCard(QFrame):
 
         date_lbl = QLabel(formatted_date)
         date_lbl.setProperty("class", "muted")
-        date_lbl.setStyleSheet("font-size: 11px;")
+        date_lbl.setStyleSheet("font-size: 8.5pt;")
 
         # Dosya diske duruyor mu?
         self._path = self.record.get("file_path", "")
         file_exists = os.path.exists(self._path)
         self._status_lbl = QLabel("✓ Kayıtlı" if file_exists else "⚠ Dosya silinmiş")
         self._status_lbl.setStyleSheet(
-            "color: #4ade80; font-size: 11px;" if file_exists else "color: #f87171; font-size: 11px;"
+            "color: #00e676; font-size: 8.5pt; font-weight: 600;" if file_exists else "color: #ff1744; font-size: 8.5pt; font-weight: 600;"
         )
 
         details_row.addWidget(date_lbl)
@@ -152,19 +157,19 @@ class HistoryCard(QFrame):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(6)
 
-        self._folder_btn = QPushButton("📁 Klasörü Aç")
+        self._folder_btn = QPushButton("Klasörü Aç")
         self._folder_btn.setProperty("class", "secondary")
         self._folder_btn.setFixedHeight(30)
         self._folder_btn.clicked.connect(self._on_open_folder)
         # Dosya yoksa klasörü açmayı engelle
         self._folder_btn.setEnabled(file_exists)
 
-        self._redownload_btn = QPushButton("🔄 Tekrar İndir")
+        self._redownload_btn = QPushButton("Tekrar İndir")
         self._redownload_btn.setProperty("class", "secondary")
         self._redownload_btn.setFixedHeight(30)
         self._redownload_btn.clicked.connect(self._on_redownload)
 
-        self._delete_btn = QPushButton("🗑 Sil")
+        self._delete_btn = QPushButton("Sil")
         self._delete_btn.setProperty("class", "danger")
         self._delete_btn.setFixedHeight(30)
         self._delete_btn.clicked.connect(self._on_delete)
@@ -179,16 +184,34 @@ class HistoryCard(QFrame):
         url = self.record.get("url", "").lower()
         if "youtube.com" in url or "youtu.be" in url:
             self._img_lbl.setText("▶")
-            self._img_lbl.setStyleSheet("font-size: 20px; color: #ff0000; background-color: #1e1e2e; border-radius: 6px;")
+            self._img_lbl.setStyleSheet("font-size: 15pt; color: #ff0000;")
         elif "instagram.com" in url:
             self._img_lbl.setText("📸")
-            self._img_lbl.setStyleSheet("font-size: 20px; color: #e1306c; background-color: #1e1e2e; border-radius: 6px;")
+            self._img_lbl.setStyleSheet("font-size: 15pt; color: #e1306c;")
         elif "tiktok.com" in url:
             self._img_lbl.setText("🎵")
-            self._img_lbl.setStyleSheet("font-size: 20px; color: #69c9d0; background-color: #1e1e2e; border-radius: 6px;")
+            self._img_lbl.setStyleSheet("font-size: 15pt; color: #69c9d0;")
         else:
             self._img_lbl.setText("🌐")
-            self._img_lbl.setStyleSheet("font-size: 20px; color: #a0a0b0; background-color: #1e1e2e; border-radius: 6px;")
+            self._img_lbl.setStyleSheet("font-size: 15pt; color: #a0a0b0;")
+
+    def update_theme(self, theme: str):
+        suffix = "white" if theme == "dark" else "dark"
+        
+        folder_path = get_icon_path(f"folder_{suffix}.png")
+        if os.path.isfile(folder_path):
+            self._folder_btn.setIcon(QIcon(folder_path))
+            self._folder_btn.setIconSize(QSize(14, 14))
+            
+        redownload_path = get_icon_path(f"download_tab_{suffix}.png")
+        if os.path.isfile(redownload_path):
+            self._redownload_btn.setIcon(QIcon(redownload_path))
+            self._redownload_btn.setIconSize(QSize(14, 14))
+            
+        delete_path = get_icon_path(f"trash_{suffix}.png")
+        if os.path.isfile(delete_path):
+            self._delete_btn.setIcon(QIcon(delete_path))
+            self._delete_btn.setIconSize(QSize(14, 14))
 
     def _load_thumbnail(self):
         url = self.record.get("thumbnail_url")
@@ -237,6 +260,7 @@ class HistoryPanelWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cards: list[HistoryCard] = []
+        self._theme = "dark"
         self._build_ui()
         self.refresh_list()
 
@@ -253,6 +277,10 @@ class HistoryPanelWidget(QWidget):
         self._search_input.setPlaceholderText("Geçmişte ara (Video adı veya link)...")
         self._search_input.setMinimumHeight(38)
         self._search_input.textChanged.connect(self._on_search_changed)
+        
+        self._search_action = self._search_input.addAction(
+            QIcon(), QLineEdit.ActionPosition.LeadingPosition
+        )
 
         self._clear_btn = QPushButton("Tümünü Temizle")
         self._clear_btn.setProperty("class", "ghost")
@@ -279,7 +307,7 @@ class HistoryPanelWidget(QWidget):
         self._empty_label = QLabel("Henüz indirme geçmişi bulunmuyor.")
         self._empty_label.setProperty("class", "muted")
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_label.setStyleSheet("font-size: 14px; margin-top: 50px;")
+        self._empty_label.setStyleSheet("font-size: 10.5pt; margin-top: 50px;")
         self._list_layout.addWidget(self._empty_label)
 
         self._scroll.setWidget(self._list_container)
@@ -307,6 +335,7 @@ class HistoryPanelWidget(QWidget):
 
             for rec in records:
                 card = HistoryCard(rec, self)
+                card.update_theme(self._theme)
                 card.redownload_requested.connect(self.redownload_requested.emit)
                 card.open_folder_requested.connect(self.open_folder_requested.emit)
                 card.delete_requested.connect(self._delete_record)
@@ -338,3 +367,14 @@ class HistoryPanelWidget(QWidget):
             history_db.clear_history()
             self._search_input.clear()
             self.refresh_list()
+
+    def update_theme(self, theme: str):
+        self._theme = theme
+        suffix = "white" if theme == "dark" else "dark"
+        
+        search_icon_path = get_icon_path(f"search_{suffix}.png")
+        if os.path.isfile(search_icon_path):
+            self._search_action.setIcon(QIcon(search_icon_path))
+            
+        for card in self._cards:
+            card.update_theme(theme)

@@ -37,10 +37,11 @@ if os.path.isfile(FFPROBE_EXE):
 else:
     print(f'[spec] UYARI: ffprobe.exe bulunamadi: {FFPROBE_EXE}')
 
-# QSS tema dosyalari (frontend/styles/)
+# QSS tema dosyalari (frontend/styles/) ve UI ikonlari
 datas = [
     (os.path.join(ROOT, 'frontend', 'styles', 'dark_theme.qss'),  'frontend/styles'),
     (os.path.join(ROOT, 'frontend', 'styles', 'light_theme.qss'), 'frontend/styles'),
+    (os.path.join(ROOT, 'assets', 'icons'), 'assets/icons'),
 ]
 
 # Uygulama ikonu (varsa)

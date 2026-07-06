@@ -1,21 +1,38 @@
-"""
-download_card.py
-----------------
-Tek bir indirme görevini gösteren kart widget'ı.
-Progress bar, başlık, platform, hız, ETA ve iptal butonu içerir.
-"""
-
-from __future__ import annotations
-
-import os
-
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+# -*- coding: utf-8 -*-
+import sys
+import requests
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QThread, QSize
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QFrame, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QProgressBar, QSizePolicy,
 )
 
 from backend.downloader import DownloadTask, DownloadWorker, DownloadStatus
+
+
+def get_icon_path(filename: str) -> str:
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    return os.path.join(base_dir, 'assets', 'icons', filename)
+
+
+class ImageLoader(QThread):
+    """ImageLoader thread to fetch images in background"""
+    loaded = pyqtSignal(bytes)
+
+    def __init__(self, url: str):
+        super().__init__()
+        self.url = url
+
+    def run(self):
+        try:
+            if self.url and self.url.startswith("http"):
+                res = requests.get(self.url, timeout=5)
+                if res.status_code == 200:
+                    self.loaded.emit(res.content)
+        except Exception:
+            pass
+
 
 
 PLATFORM_EMOJIS = {
@@ -38,15 +55,7 @@ STATUS_COLORS = {
 
 
 class DownloadCard(QFrame):
-    """
-    İndirme kuyruğundaki her iş için gösterilen kart.
-
-    ┌──────────────────────────────────────────────────────────┐
-    │ ▶  [Platform]   Başlık / başlık...            [✕ İptal] │
-    │    ████████████░░░░░░░░░░░░░░░ 42%   2.3 MB/s  01:23    │
-    │    Durum metni                                           │
-    └──────────────────────────────────────────────────────────┘
-    """
+    """DownloadCard widget representing a single item in download queue."""
 
     cancel_requested = pyqtSignal(str)   # task_id
     open_folder_requested = pyqtSignal(str)  # klasör yolu
@@ -58,23 +67,25 @@ class DownloadCard(QFrame):
         self._output_path: str = task.output_dir
         self._status = DownloadStatus.PENDING
 
-        self.setProperty("class", "card")
-        self.setFixedHeight(92)
+        self.setProperty("class", "item-card")
+        self.setFixedHeight(84)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self._build_ui()
+        self._load_thumbnail()
 
     def _build_ui(self):
         main = QHBoxLayout(self)
-        main.setContentsMargins(16, 12, 16, 12)
+        main.setContentsMargins(12, 8, 12, 8)
         main.setSpacing(12)
 
-        # Platform emoji
-        platform_icon = PLATFORM_EMOJIS.get(self.task.platform, "🌐")
-        icon_lbl = QLabel(platform_icon)
-        icon_lbl.setFixedWidth(22)
-        icon_lbl.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
-        icon_lbl.setStyleSheet("font-size: 18px;")
+        # Görsel Alanı (Thumbnail veya Platform İkonu)
+        self._img_lbl = QLabel()
+        self._img_lbl.setFixedSize(96, 54)
+        self._img_lbl.setProperty("class", "thumbnail")
+        self._img_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._set_default_platform_icon()
+        main.addWidget(self._img_lbl)
 
         # İçerik kolonu
         content = QVBoxLayout()
@@ -88,15 +99,15 @@ class DownloadCard(QFrame):
 
         title = self.task.title or self.task.url
         self._title_lbl = QLabel(title[:65] + ("..." if len(title) > 65 else ""))
-        self._title_lbl.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self._title_lbl.setStyleSheet("font-weight: 600; font-size: 10pt;")
         self._title_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         fmt_badge = QLabel(self.task.format_type.upper())
         fmt_badge.setStyleSheet(
-            "background:#e94560; color:#fff; border-radius:4px; "
-            "padding:1px 6px; font-size:10px; font-weight:700;"
+            "background: #7c4dff; color: #ffffff; border-radius: 4px; "
+            "padding: 1px 6px; font-size: 7pt; font-weight: 700;"
         )
-        fmt_badge.setFixedHeight(18)
+        fmt_badge.setFixedHeight(16)
 
         title_row.addWidget(self._title_lbl, 1)
         title_row.addWidget(fmt_badge)
@@ -163,7 +174,6 @@ class DownloadCard(QFrame):
         btn_col.addWidget(self._cancel_btn)
         btn_col.addWidget(self._open_btn)
 
-        main.addWidget(icon_lbl)
         main.addLayout(content, 1)
         main.addLayout(btn_col)
 
@@ -198,23 +208,23 @@ class DownloadCard(QFrame):
         self._speed_lbl.setText("✓")
         self._eta_lbl.setText("")
         self._status_lbl.setText("Tamamlandı!")
-        self._status_lbl.setStyleSheet("color: #4ade80; font-size: 12px;")
+        self._status_lbl.setStyleSheet("color: #00e676; font-size: 8.5pt; font-weight: 600;")
         self._cancel_btn.setVisible(False)
         self._open_btn.setVisible(True)
         # Progress bar yeşile dön
         self._progress_bar.setStyleSheet(
-            "QProgressBar::chunk { background: #4ade80; border-radius: 4px; }"
+            "QProgressBar::chunk { background: #00e676; border-radius: 4px; }"
         )
 
     def _on_error(self, msg: str):
         self._status = DownloadStatus.ERROR
         self._status_lbl.setText(f"Hata: {msg[:80]}")
-        self._status_lbl.setStyleSheet("color: #f87171; font-size: 11px;")
+        self._status_lbl.setStyleSheet("color: #ff1744; font-size: 8.5pt; font-weight: 600;")
         self._speed_lbl.setText("")
         self._eta_lbl.setText("")
         self._cancel_btn.setVisible(False)
         self._progress_bar.setStyleSheet(
-            "QProgressBar::chunk { background: #f87171; border-radius: 4px; }"
+            "QProgressBar::chunk { background: #ff1744; border-radius: 4px; }"
         )
 
     def _on_cancel(self):
@@ -222,7 +232,7 @@ class DownloadCard(QFrame):
             self._worker.cancel()
         self._status = DownloadStatus.CANCELLED
         self._status_lbl.setText("İptal edildi")
-        self._status_lbl.setStyleSheet("color: #606070; font-size: 12px;")
+        self._status_lbl.setStyleSheet("color: #606070; font-size: 9pt;")
         self._cancel_btn.setVisible(False)
         self.cancel_requested.emit(self.task.task_id)
 
@@ -231,9 +241,44 @@ class DownloadCard(QFrame):
         self.open_folder_requested.emit(folder)
 
     def set_pending(self):
-        """Kuyrukta bekliyor durumu."""
+        """Set queue pending state."""
         self._status_lbl.setText("Kuyrukta bekliyor...")
         self._status_lbl.setStyleSheet("")
 
     def get_status(self) -> DownloadStatus:
         return self._status
+
+    def _set_default_platform_icon(self):
+        """Show platform emoji until thumbnail is loaded."""
+        url = self.task.url.lower()
+        if "youtube.com" in url or "youtu.be" in url:
+            self._img_lbl.setText("▶")
+            self._img_lbl.setStyleSheet("font-size: 20px; color: #ff0000;")
+        elif "instagram.com" in url:
+            self._img_lbl.setText("📸")
+            self._img_lbl.setStyleSheet("font-size: 20px; color: #e1306c;")
+        elif "tiktok.com" in url:
+            self._img_lbl.setText("🎵")
+            self._img_lbl.setStyleSheet("font-size: 20px; color: #69c9d0;")
+        else:
+            self._img_lbl.setText("🌐")
+            self._img_lbl.setStyleSheet("font-size: 20px; color: #a0a0b0;")
+
+    def _load_thumbnail(self):
+        url = self.task.thumbnail_url
+        if not url:
+            return
+        self._loader = ImageLoader(url)
+        self._loader.loaded.connect(self._on_image_loaded)
+        self._loader.start()
+
+    def _on_image_loaded(self, data: bytes):
+        pixmap = QPixmap()
+        if pixmap.loadFromData(data):
+            scaled = pixmap.scaled(
+                96, 54,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self._img_lbl.setPixmap(scaled)
+

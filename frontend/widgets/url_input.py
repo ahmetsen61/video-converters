@@ -11,8 +11,8 @@ Sinyaller:
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QClipboard, QKeySequence
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
+from PyQt6.QtGui import QClipboard, QKeySequence, QIcon
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout,
     QLineEdit, QPushButton, QLabel, QFrame,
@@ -81,8 +81,8 @@ class URLInputWidget(QWidget):
         row.setSpacing(8)
 
         # Yapıştır butonu
-        self._paste_btn = QPushButton("📋")
-        self._paste_btn.setProperty("class", "icon")
+        self._paste_btn = QPushButton()
+        self._paste_btn.setProperty("class", "secondary")
         self._paste_btn.setToolTip("Panodan yapıştır (Ctrl+V)")
         self._paste_btn.setFixedSize(40, 40)
         self._paste_btn.clicked.connect(self._paste_from_clipboard)
@@ -97,7 +97,7 @@ class URLInputWidget(QWidget):
         self._url_input.textChanged.connect(self._on_text_changed)
 
         # Temizle butonu (URL varsa göster)
-        self._clear_btn = QPushButton("✕")
+        self._clear_btn = QPushButton()
         self._clear_btn.setProperty("class", "ghost")
         self._clear_btn.setFixedSize(32, 32)
         self._clear_btn.setVisible(False)
@@ -202,3 +202,18 @@ class URLInputWidget(QWidget):
 
     def get_url(self) -> str:
         return self._url_input.text().strip()
+
+    def update_theme(self, theme: str):
+        import sys, os
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        suffix = "white" if theme == "dark" else "dark"
+        
+        paste_path = os.path.join(base_dir, "assets", "icons", f"paste_{suffix}.png")
+        if os.path.isfile(paste_path):
+            self._paste_btn.setIcon(QIcon(paste_path))
+            self._paste_btn.setIconSize(QSize(16, 16))
+            
+        trash_path = os.path.join(base_dir, "assets", "icons", f"trash_{suffix}.png")
+        if os.path.isfile(trash_path):
+            self._clear_btn.setIcon(QIcon(trash_path))
+            self._clear_btn.setIconSize(QSize(14, 14))
